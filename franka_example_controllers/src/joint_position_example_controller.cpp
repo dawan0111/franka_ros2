@@ -72,15 +72,31 @@ controller_interface::return_type JointPositionExampleController::update(
     }
   }
 
-  double delta_angle = M_PI / 16 * (1 - std::cos(M_PI / 5.0 * elapsed_time_)) * 0.2;
-
-  for (int i = 0; i < num_joints; ++i) {
-    if (i == 4) {
-      command_interfaces_[i].set_value(initial_q_.at(i) - delta_angle);
-    } else {
-      command_interfaces_[i].set_value(initial_q_.at(i) + delta_angle);
-    }
+  auto joint_commands = rt_command_ptr_.readFromRT();
+  if (!joint_commands || !(*joint_commands)) {
+    return controller_interface::return_type::OK;
   }
+
+  if ((*joint_commands)->data.size() != command_interfaces_.size()) {
+    RCLCPP_ERROR_THROTTLE(get_node()->get_logger(), *(get_node()->get_clock()), 1000,
+                          "command size (%zu) does not match number of interfaces (%zu)",
+                          (*joint_commands)->data.size(), command_interfaces_.size());
+    return controller_interface::return_type::ERROR;
+  }
+
+  for (auto index = 0ul; index < command_interfaces_.size(); ++index) {
+    command_interfaces_[index].set_value((*joint_commands)->data[index]);
+  }
+
+  // double delta_angle = M_PI / 16 * (1 - std::cos(M_PI / 5.0 * elapsed_time_)) * 0.2;
+
+  // for (int i = 0; i < num_joints; ++i) {
+  //   if (i == 4) {
+  //     command_interfaces_[i].set_value(initial_q_.at(i) - delta_angle);
+  //   } else {
+  //     command_interfaces_[i].set_value(initial_q_.at(i) + delta_angle);
+  //   }
+  // }
 
   return controller_interface::return_type::OK;
 }
@@ -114,14 +130,26 @@ CallbackReturn JointPositionExampleController::on_configure(
 
   arm_id_ = robot_utils::getRobotNameFromDescription(robot_description_, get_node()->get_logger());
 
+  joints_command_subscriber_ = get_node()->create_subscription<CmdType>(
+      "~/commands", rclcpp::SystemDefaultsQoS(),
+      [this](const CmdType::SharedPtr msg) { rt_command_ptr_.writeFromNonRT(msg); });
+
   return CallbackReturn::SUCCESS;
 }
 
 CallbackReturn JointPositionExampleController::on_activate(
     const rclcpp_lifecycle::State& /*previous_state*/) {
+  rt_command_ptr_ = realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>>(nullptr);
   initialization_flag_ = true;
   elapsed_time_ = 0.0;
   return CallbackReturn::SUCCESS;
+}
+
+controller_interface::CallbackReturn JointPositionExampleController::on_deactivate(
+    const rclcpp_lifecycle::State& /*previous_state*/) {
+  // reset command buffer
+  rt_command_ptr_ = realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>>(nullptr);
+  return controller_interface::CallbackReturn::SUCCESS;
 }
 
 }  // namespace franka_example_controllers

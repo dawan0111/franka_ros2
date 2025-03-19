@@ -19,11 +19,14 @@
 #include <Eigen/Eigen>
 #include <controller_interface/controller_interface.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <std_msgs/msg/float64_multi_array.hpp>
 #include "franka_semantic_components/franka_robot_state.hpp"
+#include "realtime_tools/realtime_buffer.h"
 
 using CallbackReturn = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
 
 namespace franka_example_controllers {
+using CmdType = std_msgs::msg::Float64MultiArray;
 
 /**
  * The joint position example controller moves in a periodic movement.
@@ -39,6 +42,7 @@ class JointPositionExampleController : public controller_interface::ControllerIn
   CallbackReturn on_init() override;
   CallbackReturn on_configure(const rclcpp_lifecycle::State& previous_state) override;
   CallbackReturn on_activate(const rclcpp_lifecycle::State& previous_state) override;
+  CallbackReturn on_deactivate(const rclcpp_lifecycle::State& previous_state) override;
 
  private:
   std::string arm_id_;
@@ -52,6 +56,9 @@ class JointPositionExampleController : public controller_interface::ControllerIn
   double trajectory_period_ = 0.001;
   bool initialization_flag_{true};
   rclcpp::Time start_time_;
+
+  realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>> rt_command_ptr_{nullptr};
+  rclcpp::Subscription<CmdType>::SharedPtr joints_command_subscriber_{nullptr};
 };
 
 }  // namespace franka_example_controllers
