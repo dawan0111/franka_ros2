@@ -3,7 +3,7 @@
 <package format="3">
   <name>franka_rl_example</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>A simple ROS2 package for controlling Franka arm robot using reinforcement learning</description>
   <maintainer email="msd030428@gmail.com">airo</maintainer>
   <license>Apache-2.0</license>
 
@@ -11,6 +11,9 @@
   <test_depend>ament_flake8</test_depend>
   <test_depend>ament_pep257</test_depend>
   <test_depend>python3-pytest</test_depend>
+
+  <depend>rclpy</depend>
+  <depend>std_msgs</depend>
 
   <export>
     <build_type>ament_python</build_type>
