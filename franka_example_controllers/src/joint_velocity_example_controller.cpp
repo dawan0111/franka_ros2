@@ -50,21 +50,37 @@ JointVelocityExampleController::state_interface_configuration() const {
 controller_interface::return_type JointVelocityExampleController::update(
     const rclcpp::Time& /*time*/,
     const rclcpp::Duration& period) {
-  elapsed_time_ = elapsed_time_ + period;
-  rclcpp::Duration time_max(8.0, 0.0);
-  double omega_max = 0.1;
-  double cycle = std::floor(std::pow(
-      -1.0, (elapsed_time_.seconds() - std::fmod(elapsed_time_.seconds(), time_max.seconds())) /
-                time_max.seconds()));
-  double omega = cycle * omega_max / 2.0 *
-                 (1.0 - std::cos(2.0 * M_PI / time_max.seconds() * elapsed_time_.seconds()));
+  // elapsed_time_ = elapsed_time_ + period;
+  // rclcpp::Duration time_max(8.0, 0.0);
+  // double omega_max = 0.1;
+  // double cycle = std::floor(std::pow(
+  //     -1.0, (elapsed_time_.seconds() - std::fmod(elapsed_time_.seconds(), time_max.seconds())) /
+  //               time_max.seconds()));
+  // double omega = cycle * omega_max / 2.0 *
+  //                (1.0 - std::cos(2.0 * M_PI / time_max.seconds() * elapsed_time_.seconds()));
 
-  for (int i = 0; i < num_joints; i++) {
-    if (i == 3 || i == 4) {
-      command_interfaces_[i].set_value(omega);
-    } else {
-      command_interfaces_[i].set_value(0.0);
-    }
+  // for (int i = 0; i < num_joints; i++) {
+  //   if (i == 3 || i == 4) {
+  //     command_interfaces_[i].set_value(omega);
+  //   } else {
+  //     command_interfaces_[i].set_value(0.0);
+  //   }
+  // }
+
+  auto joint_commands = rt_command_ptr_.readFromRT();
+  if (!joint_commands || !(*joint_commands)) {
+    return controller_interface::return_type::OK;
+  }
+
+  if ((*joint_commands)->data.size() != command_interfaces_.size()) {
+    RCLCPP_ERROR_THROTTLE(get_node()->get_logger(), *(get_node()->get_clock()), 1000,
+                          "command size (%zu) does not match number of interfaces (%zu)",
+                          (*joint_commands)->data.size(), command_interfaces_.size());
+    return controller_interface::return_type::ERROR;
+  }
+
+  for (auto index = 0ul; index < command_interfaces_.size(); ++index) {
+    command_interfaces_[index].set_value((*joint_commands)->data[index]);
   }
   return controller_interface::return_type::OK;
 }
@@ -96,6 +112,10 @@ CallbackReturn JointVelocityExampleController::on_configure(
     RCLCPP_ERROR(get_node()->get_logger(), "Failed to get robot_description parameter.");
   }
 
+  joints_command_subscriber_ = get_node()->create_subscription<CmdType>(
+      "~/commands", rclcpp::SystemDefaultsQoS(),
+      [this](const CmdType::SharedPtr msg) { rt_command_ptr_.writeFromNonRT(msg); });
+
   arm_id_ = robot_utils::getRobotNameFromDescription(robot_description_, get_node()->get_logger());
 
   if (!is_gazebo) {
@@ -120,6 +140,7 @@ CallbackReturn JointVelocityExampleController::on_configure(
 
 CallbackReturn JointVelocityExampleController::on_activate(
     const rclcpp_lifecycle::State& /*previous_state*/) {
+  rt_command_ptr_ = realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>>(nullptr);
   elapsed_time_ = rclcpp::Duration(0, 0);
   return CallbackReturn::SUCCESS;
 }

@@ -52,6 +52,8 @@ def get_robot_description(context: LaunchContext, arm_id, load_gripper, franka_h
             'ee_id': franka_hand_str
         }
     )
+
+    print(robot_description_config.toxml())
     robot_description = {'robot_description': robot_description_config.toxml()}
 
     robot_state_publisher = Node(
