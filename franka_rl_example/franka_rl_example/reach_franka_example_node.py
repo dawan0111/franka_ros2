@@ -12,6 +12,7 @@ import os
 
 from ament_index_python.packages import get_package_share_directory 
 
+
 def get_tf_mat(i, dh):
     a = dh[i][0]
     d = dh[i][1]
@@ -26,17 +27,16 @@ def get_tf_mat(i, dh):
 
 
 def get_fk_solution(joint_angles):
-    M_PI = np.pi
-
-        # Create DH parameters (data given by maker franka-emika)
-    dh_params = [[ 0,      0,        0.333,   joint_angles[0]],
-            [-M_PI/2,   0,        0,       joint_angles[1]],
-            [ M_PI/2,   0,        0.316,   joint_angles[2]],
-            [ M_PI/2,   0.0825,   0,       joint_angles[3]],
-            [-M_PI/2,  -0.0825,   0.384,   joint_angles[4]],
-            [ M_PI/2,   0,        0,       joint_angles[5]],
-            [ M_PI/2,   0.088,    0.107,   joint_angles[6]]]
-
+    dh_params = [[0, 0.333, 0, joint_angles[0]],
+                 [0, 0, -np.pi/2, joint_angles[1]],
+                 [0, 0.316, np.pi/2, joint_angles[2]],
+                 [0.0825, 0, np.pi/2, joint_angles[3]],
+                 [-0.0825, 0.384, -np.pi/2, joint_angles[4]],
+                 [0, 0, np.pi/2, joint_angles[5]],
+                 [0.088, 0, np.pi/2, joint_angles[6]],
+                 [0, 0.107, 0, 0],
+                 [0, 0, 0, -np.pi/4],
+                 [0.0, 0.1034, 0, 0]]
 
     T = np.eye(4)
     for i in range(7 + 3):
@@ -97,6 +97,7 @@ class ReachFrankaExampleNode(Node):
         self.tick = 0
         self.filter = MovingAverageFilter(window_size=100)
         self.start_time = time.time()
+        self.robot_joint_pos = np.array(self.joint_pos_dim)
         
     def loop(self):
         if not self.initialize:
@@ -120,16 +121,16 @@ class ReachFrankaExampleNode(Node):
             return
         
 
-        ee_pose = get_fk_solution(self.joint_pos[:7].tolist())
+        ee_pose = get_fk_solution(self.robot_joint_pos[:7].tolist())
         ee_trans = ee_pose[:3, 3]
         goal_trans = self.pose_command[:3]
 
-        print(ee_trans, goal_trans)
+        # print(ee_trans, goal_trans)
         dist = np.linalg.norm(ee_trans - goal_trans)
 
         # if dist <= 0.7:
         #     msg = Float64MultiArray()
-        #     msg.data = self.joint_pos[:7].tolist()
+        #     msg.data = self.robot_joint_pos[:7].tolist()
         #     self.publisher_.publish(msg)
         #     return
         
@@ -226,6 +227,7 @@ class ReachFrankaExampleNode(Node):
         self.joint_vel[-2] = -0.004
 
         self.initialize = True
+        self.robot_joint_pos = np.array(msg.position)
 
         # print("pos:", self.joint_pos)
         # print("vel:", self.joint_vel)
